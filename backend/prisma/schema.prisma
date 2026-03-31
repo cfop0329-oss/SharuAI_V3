@@ -26,3 +26,62 @@ model User {
   certificate_file_url String?
   created_at           DateTime @default(now())
 }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String              @id @default(uuid())
+  bin_iin              String              @unique
+  user_type            String
+  org_form             String
+  organization_name    String
+  registration_date    DateTime?
+  director             String
+  region               String
+  district             String?
+  rural_district       String?
+  locality             String?
+  phone                String?
+  postal_address       String?
+  email                String              @unique
+  password_hash        String
+  certificate_file_url String?
+  created_at           DateTime            @default(now())
+
+  subsidy_applications SubsidyApplication[]
+  counter_obligations  CounterObligation[]
+}
+
+model SubsidyApplication {
+  id               String   @id @default(uuid())
+  user_id          String
+  subsidy_type     String
+  requested_amount Float?
+  description      String?
+  status           String   @default("submitted")
+  created_at       DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model CounterObligation {
+  id                     String   @id @default(uuid())
+  user_id                String
+  subsidy_year           Int
+  subsidy_amount         Float?
+  obligation_description String
+  planned_value          Float?
+  actual_value           Float?
+  status                 String   @default("filled_manually")
+  notes                  String?
+  source                 String   @default("manual")
+  created_at             DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

@@ -3,3 +3,13 @@
     "react-router-dom": "^7.13.2"
   }
 }
+{
+  "name": "sharuai-v3",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
