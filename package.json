@@ -1,9 +1,7 @@
 {
   "dependencies": {
     "react-router-dom": "^7.13.2"
-  }
-}
-{
+  },
   "name": "sharuai-v3",
   "private": true,
   "scripts": {
