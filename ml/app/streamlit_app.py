@@ -1,13 +1,15 @@
-import math
 from pathlib import Path
 
 import joblib
-import numpy as np
 import pandas as pd
 import streamlit as st
 from catboost import CatBoostRegressor, Pool
 
-st.set_page_config(page_title="Merit Score App", layout="wide")
+
+st.set_page_config(
+    page_title="SharuAI V3 — Merit Score",
+    layout="wide"
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -18,9 +20,6 @@ DEFAULT_VALUES_PATH = BASE_DIR / "default_values.pkl"
 CATEGORY_OPTIONS_PATH = BASE_DIR / "category_options.pkl"
 
 
-# =========================
-# Загрузка
-# =========================
 @st.cache_resource
 def load_model():
     model = CatBoostRegressor()
@@ -37,45 +36,6 @@ def load_artifacts():
     return model_columns, categorical_cols, default_values, category_options
 
 
-required_files = [
-    MODEL_PATH,
-    MODEL_COLUMNS_PATH,
-    CATEGORICAL_COLS_PATH,
-    DEFAULT_VALUES_PATH,
-    CATEGORY_OPTIONS_PATH,
-]
-
-missing_files = [p.name for p in required_files if not p.exists()]
-if missing_files:
-    st.error("Не найдены нужные файлы рядом с app.py:")
-    for f in missing_files:
-        st.write(f"- {f}")
-    st.stop()
-
-try:
-    model = load_model()
-    model_columns, categorical_cols, default_values, category_options = load_artifacts()
-except Exception as e:
-    st.error(f"Ошибка загрузки модели или артефактов: {e}")
-    st.stop()
-
-if not isinstance(model_columns, list) or len(model_columns) == 0:
-    st.error("model_columns.pkl поврежден или пуст.")
-    st.stop()
-
-if not isinstance(categorical_cols, list):
-    categorical_cols = []
-
-if not isinstance(default_values, dict):
-    default_values = {}
-
-if not isinstance(category_options, dict):
-    category_options = {}
-
-
-# =========================
-# Подписи
-# =========================
 LABELS = {
     "record_no": "Номер записи",
     "year": "Год",
@@ -197,24 +157,12 @@ INT_COLUMNS = {
 
 BINARY_COLUMNS = {"unmet_obligations_flag"}
 
-DERIVED_DATE_COLUMNS = {"year", "month", "quarter", "day_of_year"}
 
-
-# =========================
-# Вспомогательные штуки
-# =========================
 def is_missing_value(x):
     try:
         return pd.isna(x)
     except Exception:
         return False
-
-
-def safe_default(col, fallback=0):
-    value = default_values.get(col, fallback)
-    if is_missing_value(value):
-        return fallback
-    return value
 
 
 def safe_int(value, fallback=0):
@@ -242,28 +190,37 @@ def safe_str(value, fallback="Unknown"):
     return text if text else fallback
 
 
-def get_cat_options(col):
+def get_cat_options(col, default_values, category_options):
     raw_options = category_options.get(col, [])
     clean_options = []
 
     for val in raw_options:
         if not is_missing_value(val):
-            clean_options.append(str(val).strip())
+            val = str(val).strip()
+            if val:
+                clean_options.append(val)
 
-    clean_options = [x for x in clean_options if x != ""]
     clean_options = sorted(set(clean_options))
 
     default_str = safe_str(default_values.get(col, "Unknown"))
     if default_str not in clean_options:
-        clean_options = [default_str] + clean_options
+        clean_options.insert(0, default_str)
 
-    if len(clean_options) == 0:
+    if not clean_options:
         clean_options = ["Unknown"]
 
     return clean_options
 
 
-def build_input_row(widget_values, application_date):
+def get_priority_label(score):
+    if score >= 80:
+        return "Высокий приоритет"
+    if score >= 60:
+        return "Средний приоритет"
+    return "Низкий приоритет"
+
+
+def build_input_row(model_columns, categorical_cols, default_values, widget_values, application_date):
     row = {}
 
     for col in model_columns:
@@ -280,12 +237,10 @@ def build_input_row(widget_values, application_date):
     if "day_of_year" in model_columns:
         row["day_of_year"] = int(dt.dayofyear)
 
-    for col in model_columns:
-        if col in widget_values:
-            row[col] = widget_values[col]
+    for col, val in widget_values.items():
+        row[col] = val
 
-    input_df = pd.DataFrame([row])
-    input_df = input_df.reindex(columns=model_columns)
+    input_df = pd.DataFrame([row]).reindex(columns=model_columns)
 
     for col in model_columns:
         if col in categorical_cols:
@@ -298,18 +253,15 @@ def build_input_row(widget_values, application_date):
     return input_df
 
 
-def build_shap_explanation(input_df):
+def build_shap_explanation(model, input_df, categorical_cols):
     cat_feature_names = [col for col in categorical_cols if col in input_df.columns]
 
-    input_pool = Pool(
+    pool = Pool(
         data=input_df,
         cat_features=cat_feature_names
     )
 
-    shap_values = model.get_feature_importance(
-        input_pool,
-        type="ShapValues"
-    )
+    shap_values = model.get_feature_importance(pool, type="ShapValues")
 
     base_value = float(shap_values[0, -1])
     shap_row = shap_values[0, :-1]
@@ -326,7 +278,7 @@ def build_shap_explanation(input_df):
 
     negative_df = (
         explain_df[explain_df["shap_value"] < 0]
-        .sort_values("shap_value", ascending=True)
+        .sort_values("shap_value")
         .head(7)
         .copy()
     )
@@ -341,135 +293,174 @@ def build_shap_explanation(input_df):
     return base_value, explain_df, negative_df, positive_df
 
 
-def get_priority_label(prediction):
-    if prediction >= 80:
-        return "Высокий приоритет"
-    if prediction >= 60:
-        return "Средний приоритет"
-    return "Низкий приоритет"
+def validate_files():
+    required_files = [
+        MODEL_PATH,
+        MODEL_COLUMNS_PATH,
+        CATEGORICAL_COLS_PATH,
+        DEFAULT_VALUES_PATH,
+        CATEGORY_OPTIONS_PATH,
+    ]
+    missing = [p.name for p in required_files if not p.exists()]
+    return missing
 
 
-# =========================
-# Интерфейс
-# =========================
-st.title("Скоринг сельхозпроизводителя")
-st.caption("Введите параметры заявки и хозяйства, чтобы получить merit_score и причины оценки.")
+def main():
+    st.title("SharuAI V3 — Скоринг сельхозпроизводителя")
+    st.caption("Пользователь вводит данные, модель считает merit_score и показывает объяснение результата.")
 
-st.subheader("Дата")
-application_date = st.date_input("Дата заявки")
+    missing_files = validate_files()
+    if missing_files:
+        st.error("Не найдены нужные файлы:")
+        for file_name in missing_files:
+            st.write(f"- {file_name}")
+        st.stop()
 
-widget_values = {}
-
-for section_name, cols in SECTION_MAP.items():
-    available_cols = [c for c in cols if c in model_columns]
-    if not available_cols:
-        continue
-
-    st.subheader(section_name)
-    ui_cols = st.columns(3)
-
-    for i, col in enumerate(available_cols):
-        label = LABELS.get(col, col)
-        slot = ui_cols[i % 3]
-
-        with slot:
-            if col in categorical_cols:
-                options = get_cat_options(col)
-                default_str = safe_str(default_values.get(col, "Unknown"))
-                default_index = options.index(default_str) if default_str in options else 0
-
-                widget_values[col] = st.selectbox(
-                    label,
-                    options=options,
-                    index=default_index,
-                    key=f"widget_{col}"
-                )
-
-            elif col in BINARY_COLUMNS:
-                default_int = 1 if safe_int(default_values.get(col, 0)) == 1 else 0
-                widget_values[col] = st.selectbox(
-                    label,
-                    options=[0, 1],
-                    index=default_int,
-                    key=f"widget_{col}"
-                )
-
-            elif col in INT_COLUMNS:
-                default_int = safe_int(default_values.get(col, 0), 0)
-                widget_values[col] = st.number_input(
-                    label,
-                    value=default_int,
-                    step=1,
-                    key=f"widget_{col}"
-                )
-
-            else:
-                default_float = safe_float(default_values.get(col, 0.0), 0.0)
-                widget_values[col] = st.number_input(
-                    label,
-                    value=default_float,
-                    key=f"widget_{col}"
-                )
-
-with st.expander("Показать все признаки модели"):
-    st.write(model_columns)
-
-predict_clicked = st.button("Рассчитать merit_score", type="primary")
-
-if predict_clicked:
     try:
-        input_df = build_input_row(widget_values, application_date)
-        prediction = float(model.predict(input_df)[0])
-        priority = get_priority_label(prediction)
+        model = load_model()
+        model_columns, categorical_cols, default_values, category_options = load_artifacts()
+    except Exception as e:
+        st.error(f"Ошибка загрузки модели/артефактов: {e}")
+        st.stop()
 
-        st.success(f"Predicted merit_score: {prediction:.2f}")
-        st.info(f"Интерпретация: {priority}")
+    if not isinstance(model_columns, list) or not model_columns:
+        st.error("model_columns.pkl пустой или поврежден.")
+        st.stop()
 
+    if not isinstance(categorical_cols, list):
+        categorical_cols = []
+
+    if not isinstance(default_values, dict):
+        default_values = {}
+
+    if not isinstance(category_options, dict):
+        category_options = {}
+
+    st.subheader("Дата заявки")
+    application_date = st.date_input("Выберите дату заявки")
+
+    widget_values = {}
+
+    for section_name, cols in SECTION_MAP.items():
+        existing_cols = [c for c in cols if c in model_columns]
+        if not existing_cols:
+            continue
+
+        st.subheader(section_name)
+        cols_ui = st.columns(3)
+
+        for i, col in enumerate(existing_cols):
+            label = LABELS.get(col, col)
+
+            with cols_ui[i % 3]:
+                if col in categorical_cols:
+                    options = get_cat_options(col, default_values, category_options)
+                    default_value = safe_str(default_values.get(col, "Unknown"))
+                    default_index = options.index(default_value) if default_value in options else 0
+
+                    widget_values[col] = st.selectbox(
+                        label,
+                        options=options,
+                        index=default_index,
+                        key=f"widget_{col}"
+                    )
+
+                elif col in BINARY_COLUMNS:
+                    default_value = 1 if safe_int(default_values.get(col, 0)) == 1 else 0
+                    widget_values[col] = st.selectbox(
+                        label,
+                        options=[0, 1],
+                        index=default_value,
+                        key=f"widget_{col}"
+                    )
+
+                elif col in INT_COLUMNS:
+                    widget_values[col] = st.number_input(
+                        label,
+                        value=safe_int(default_values.get(col, 0)),
+                        step=1,
+                        key=f"widget_{col}"
+                    )
+
+                else:
+                    widget_values[col] = st.number_input(
+                        label,
+                        value=safe_float(default_values.get(col, 0.0)),
+                        key=f"widget_{col}"
+                    )
+
+    with st.expander("Показать признаки модели"):
+        st.write(model_columns)
+
+    if st.button("Рассчитать merit_score", type="primary"):
         try:
-            base_value, explain_df, negative_df, positive_df = build_shap_explanation(input_df)
+            input_df = build_input_row(
+                model_columns=model_columns,
+                categorical_cols=categorical_cols,
+                default_values=default_values,
+                widget_values=widget_values,
+                application_date=application_date
+            )
 
-            st.subheader("Почему получился такой score")
+            prediction = float(model.predict(input_df)[0])
+            priority = get_priority_label(prediction)
 
-            left_col, right_col = st.columns(2)
+            st.success(f"Predicted merit_score: {prediction:.2f}")
+            st.info(f"Класс оценки: {priority}")
 
-            with left_col:
-                st.markdown("**Факторы, которые снизили score**")
-                if negative_df.empty:
-                    st.write("Сильных негативных факторов не найдено.")
-                else:
-                    neg_show = negative_df[["feature_ru", "value", "shap_value"]].copy()
-                    neg_show.columns = ["Фактор", "Значение", "Влияние"]
-                    st.dataframe(neg_show, use_container_width=True)
+            try:
+                base_value, explain_df, negative_df, positive_df = build_shap_explanation(
+                    model=model,
+                    input_df=input_df,
+                    categorical_cols=categorical_cols
+                )
 
-            with right_col:
-                st.markdown("**Факторы, которые повысили score**")
-                if positive_df.empty:
-                    st.write("Сильных позитивных факторов не найдено.")
-                else:
-                    pos_show = positive_df[["feature_ru", "value", "shap_value"]].copy()
-                    pos_show.columns = ["Фактор", "Значение", "Влияние"]
-                    st.dataframe(pos_show, use_container_width=True)
+                st.subheader("Почему модель дала такую оценку")
 
-            st.subheader("Краткое объяснение")
+                left, right = st.columns(2)
 
-            if not negative_df.empty:
-                neg_text = ", ".join(negative_df["feature_ru"].head(3).tolist())
-                st.write(f"Сильнее всего снизили итоговый score: {neg_text}.")
+                with left:
+                    st.markdown("**Факторы, которые понизили score**")
+                    if negative_df.empty:
+                        st.write("Негативных факторов не найдено.")
+                    else:
+                        neg_show = negative_df[["feature_ru", "value", "shap_value"]].copy()
+                        neg_show.columns = ["Фактор", "Значение", "Влияние"]
+                        st.dataframe(neg_show, use_container_width=True)
 
-            if not positive_df.empty:
-                pos_text = ", ".join(positive_df["feature_ru"].head(3).tolist())
-                st.write(f"Сильнее всего повысили итоговый score: {pos_text}.")
+                with right:
+                    st.markdown("**Факторы, которые повысили score**")
+                    if positive_df.empty:
+                        st.write("Позитивных факторов не найдено.")
+                    else:
+                        pos_show = positive_df[["feature_ru", "value", "shap_value"]].copy()
+                        pos_show.columns = ["Фактор", "Значение", "Влияние"]
+                        st.dataframe(pos_show, use_container_width=True)
 
-            st.caption(f"Base value модели: {base_value:.2f}")
+                st.subheader("Краткое объяснение")
 
-        except Exception as shap_error:
-            st.warning(f"Предсказание рассчитано, но объяснение SHAP не удалось построить: {shap_error}")
+                if not negative_df.empty:
+                    neg_text = ", ".join(negative_df["feature_ru"].head(3).tolist())
+                    st.write(f"Сильнее всего снизили итоговый score: {neg_text}.")
 
-        with st.expander("Посмотреть входные данные"):
-            show_df = input_df.T.reset_index()
-            show_df.columns = ["feature", "value"]
-            show_df["feature"] = show_df["feature"].map(lambda x: LABELS.get(x, x))
-            st.dataframe(show_df, use_container_width=True)
+                if not positive_df.empty:
+                    pos_text = ", ".join(positive_df["feature_ru"].head(3).tolist())
+                    st.write(f"Сильнее всего повысили итоговый score: {pos_text}.")
 
-    except Exception as predict_error:
-        st.error(f"Ошибка при расчете score: {predict_error}")
+                st.caption(f"Base value модели: {base_value:.2f}")
+
+            except Exception as shap_error:
+                st.warning(f"Скор посчитан, но SHAP-объяснение не построилось: {shap_error}")
+
+            with st.expander("Посмотреть входные данные"):
+                show_df = input_df.T.reset_index()
+                show_df.columns = ["feature", "value"]
+                show_df["feature"] = show_df["feature"].map(lambda x: LABELS.get(x, x))
+                st.dataframe(show_df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Ошибка при расчете оценки: {e}")
+
+
+if __name__ == "__main__":
+    main()

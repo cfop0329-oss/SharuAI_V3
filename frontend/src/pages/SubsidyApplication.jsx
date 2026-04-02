@@ -1,401 +1,414 @@
-import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "http://localhost:5001";
 
-const SUBSIDY_TYPES = [
+const initialForm = {
+  application_date: "",
+
+  region: "",
+  district: "",
+  akimat: "",
+  direction: "",
+  species: "",
+  subsidy_program: "",
+  producer_type: "",
+
+  entitled_amount_kzt: "",
+  subsidized_units_est: "",
+  years_in_operation: "",
+  employees_count: "",
+  land_area_ha: "",
+  herd_size_head: "",
+  output_volume_tons: "",
+  productivity_index: "",
+  revenue_kzt: "",
+  ebitda_margin_pct: "",
+  debt_to_revenue_pct: "",
+
+  prior_subsidies_count_3y: "",
+  prior_subsidies_amount_kzt_3y: "",
+  prior_violations_count_3y: "",
+  prior_refunds_count_3y: "",
+  prior_refunds_amount_kzt_3y: "",
+  unmet_obligations_flag: 0,
+
+  past_applications_count: "",
+  past_approved_count: "",
+  past_rejected_count: "",
+  past_withdrawn_count: "",
+  past_paid_amount_kzt: "",
+};
+
+const labels = {
+  application_date: "Дата заявки",
+  region: "Регион",
+  district: "Район",
+  akimat: "Акимат",
+  direction: "Направление",
+  species: "Вид",
+  subsidy_program: "Программа субсидии",
+  producer_type: "Тип хозяйства",
+
+  entitled_amount_kzt: "Сумма субсидии, KZT",
+  subsidized_units_est: "Количество единиц",
+  years_in_operation: "Лет работы",
+  employees_count: "Количество сотрудников",
+  land_area_ha: "Площадь земли, га",
+  herd_size_head: "Поголовье",
+  output_volume_tons: "Объем выпуска, т",
+  productivity_index: "Индекс продуктивности",
+  revenue_kzt: "Выручка, KZT",
+  ebitda_margin_pct: "EBITDA margin, %",
+  debt_to_revenue_pct: "Debt / Revenue, %",
+
+  prior_subsidies_count_3y: "Субсидий за 3 года",
+  prior_subsidies_amount_kzt_3y: "Сумма субсидий за 3 года, KZT",
+  prior_violations_count_3y: "Нарушения за 3 года",
+  prior_refunds_count_3y: "Возвраты за 3 года",
+  prior_refunds_amount_kzt_3y: "Сумма возвратов за 3 года, KZT",
+  unmet_obligations_flag: "Невыполненные обязательства",
+
+  past_applications_count: "Прошлых заявок",
+  past_approved_count: "Ранее одобрено",
+  past_rejected_count: "Ранее отклонено",
+  past_withdrawn_count: "Ранее отозвано",
+  past_paid_amount_kzt: "Ранее выплачено, KZT",
+};
+
+const sections = [
   {
-    code: "SELECTION_COMMERCIAL_DAMS",
-    label: "Селекционная и племенная работа с товарным маточным поголовьем КРС",
+    title: "Общая информация",
+    fields: [
+      "application_date",
+      "region",
+      "district",
+      "akimat",
+      "direction",
+      "species",
+      "subsidy_program",
+      "producer_type",
+    ],
   },
   {
-    code: "SELECTION_PEDIGREE_DAMS",
-    label: "Селекционная и племенная работа с племенным маточным поголовьем КРС",
+    title: "Параметры заявки",
+    fields: ["entitled_amount_kzt", "subsidized_units_est"],
   },
   {
-    code: "BREEDING_DOMESTIC_BEEF",
-    label: "Приобретение отечественного племенного маточного поголовья КРС мясных и мясо-молочных пород",
+    title: "Параметры хозяйства",
+    fields: [
+      "years_in_operation",
+      "employees_count",
+      "land_area_ha",
+      "herd_size_head",
+      "output_volume_tons",
+      "productivity_index",
+      "revenue_kzt",
+      "ebitda_margin_pct",
+      "debt_to_revenue_pct",
+    ],
   },
   {
-    code: "BREEDING_DOMESTIC_DAIRY",
-    label: "Приобретение отечественного племенного маточного поголовья КРС молочных и молочно-мясных пород",
+    title: "История и риски",
+    fields: [
+      "prior_subsidies_count_3y",
+      "prior_subsidies_amount_kzt_3y",
+      "prior_violations_count_3y",
+      "prior_refunds_count_3y",
+      "prior_refunds_amount_kzt_3y",
+      "unmet_obligations_flag",
+    ],
   },
   {
-    code: "BREEDING_IMPORTED_CIS_UA_BEEF",
-    label: "Приобретение импортированного племенного маточного поголовья КРС мясных и мясо-молочных пород из стран СНГ и Украины",
-  },
-  {
-    code: "BREEDING_IMPORTED_AMERICA_EUROPE_BEEF",
-    label: "Приобретение импортированного племенного маточного поголовья КРС мясных и мясо-молочных пород из Австралии, Северной и Южной Америки, Европы",
-  },
-  {
-    code: "BREEDING_IMPORTED_CIS_UA_DAIRY",
-    label: "Приобретение импортированного племенного маточного поголовья КРС молочных и молочно-мясных пород из стран СНГ и Украины",
-  },
-  {
-    code: "BREEDING_IMPORTED_AMERICA_EUROPE_DAIRY",
-    label: "Приобретение импортированного племенного маточного поголовья КРС молочных и молочно-мясных пород из Австралии, Северной и Южной Америки, Европы",
-  },
-  {
-    code: "BREEDING_BULLS_BEEF",
-    label: "Приобретение племенных быков-производителей мясных и мясо-молочных пород",
-  },
-  {
-    code: "SEMEN_SINGLE_SEX",
-    label: "Удешевление стоимости семени племенных быков-производителей (однополое)",
-  },
-  {
-    code: "SEMEN_BISEXUAL",
-    label: "Удешевление стоимости семени племенных быков-производителей (двуполое)",
-  },
-  {
-    code: "YOUNG_STOCK_BEEF",
-    label: "Удешевление затрат при выращивании племенного молодняка КРС мясного направления",
-  },
-  {
-    code: "CATTLE_TRANSFER_TO_FEEDLOT",
-    label: "Удешевление стоимости КРС, реализованных или перемещенных на откормплощадки",
-  },
-  {
-    code: "CATTLE_TRANSFER_TO_PROCESSING",
-    label: "Удешевление стоимости КРС, реализованных или перемещенных на мясоперерабатывающие предприятия",
-  },
-  {
-    code: "MILK_COOPERATIVE",
-    label: "Субсидирование производства молока для сельскохозяйственных кооперативов",
-  },
-  {
-    code: "MILK_50_HEAD",
-    label: "Субсидирование производства молока при наличии фуражного поголовья коров от 50 голов",
-  },
-  {
-    code: "MILK_400_HEAD",
-    label: "Субсидирование производства молока при наличии фуражного поголовья коров от 400 голов",
-  },
-  {
-    code: "MILK_600_HEAD",
-    label: "Субсидирование производства молока при наличии фуражного поголовья коров от 600 голов",
-  },
-  {
-    code: "FEED_DAIRY_DAMS",
-    label: "Удешевление стоимости затрат на корма для маточного поголовья КРС молочного и молочно-мясного направления",
-  },
-  {
-    code: "FEED_TURKESTAN_DAIRY",
-    label: "Удешевление стоимости затрат на корма для маточного поголовья КРС в Туркестанской области",
+    title: "История заявок",
+    fields: [
+      "past_applications_count",
+      "past_approved_count",
+      "past_rejected_count",
+      "past_withdrawn_count",
+      "past_paid_amount_kzt",
+    ],
   },
 ];
 
-export default function SubsidyApplication() {
-  const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
+const selectOptions = {
+  region: ["", "Акмолинская область", "Алматинская область", "Туркестанская область", "Костанайская область"],
+  district: ["", "Енбекшиказахский", "Сарыагашский", "Аршалынский", "Карасуский"],
+  akimat: ["", "Акимат 1", "Акимат 2", "Акимат 3"],
+  direction: ["", "Скотоводство", "Растениеводство", "Молочное направление"],
+  species: ["", "КРС", "МРС", "Лошади", "Птица"],
+  subsidy_program: ["", "Программа 1", "Программа 2", "Программа 3"],
+  producer_type: ["", "Фермер", "ТОО", "КХ", "ИП"],
+  unmet_obligations_flag: [
+    { value: 0, label: "Нет" },
+    { value: 1, label: "Да" },
+  ],
+};
 
-  const [search, setSearch] = useState("");
+const numericFields = new Set([
+  "entitled_amount_kzt",
+  "subsidized_units_est",
+  "years_in_operation",
+  "employees_count",
+  "land_area_ha",
+  "herd_size_head",
+  "output_volume_tons",
+  "productivity_index",
+  "revenue_kzt",
+  "ebitda_margin_pct",
+  "debt_to_revenue_pct",
+  "prior_subsidies_count_3y",
+  "prior_subsidies_amount_kzt_3y",
+  "prior_violations_count_3y",
+  "prior_refunds_count_3y",
+  "prior_refunds_amount_kzt_3y",
+  "unmet_obligations_flag",
+  "past_applications_count",
+  "past_approved_count",
+  "past_rejected_count",
+  "past_withdrawn_count",
+  "past_paid_amount_kzt",
+]);
+
+function toNumber(value) {
+  if (value === "" || value === null || value === undefined) return 0;
+  const n = Number(value);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function normalizePayload(form) {
+  const payload = { ...form };
+  Object.keys(payload).forEach((key) => {
+    if (numericFields.has(key)) payload[key] = toNumber(payload[key]);
+  });
+  return payload;
+}
+
+function getPriorityColor(priority) {
+  const text = String(priority || "").toUpperCase();
+  if (text === "HIGH") return "#166534";
+  if (text === "MEDIUM") return "#b45309";
+  if (text === "LOW") return "#b91c1c";
+  return "#1d4ed8";
+}
+
+function priorityLabel(priority) {
+  if (priority === "HIGH") return "Высокий";
+  if (priority === "MEDIUM") return "Средний";
+  if (priority === "LOW") return "Низкий";
+  return priority || "—";
+}
+
+export default function SubsidyApplication() {
+  const user = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  }, []);
+
   const [form, setForm] = useState({
-    subsidy_type: "",
-    requested_amount: "",
-    description: "",
+    ...initialForm,
+    region: user?.region || "",
+    district: user?.district || "",
   });
 
-  const [access, setAccess] = useState(null);
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [result, setResult] = useState(null);
 
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
-
-  useEffect(() => {
-    if (!token) {
-      navigate("/");
-      return;
-    }
-
-    const loadAccess = async () => {
-      try {
-        setCheckingAccess(true);
-
-        const res = await axios.get(`${API_URL}/api/subsidy/application-access`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setAccess(res.data);
-      } catch (err) {
-        setIsError(true);
-        setMessage(
-          err.response?.data?.message || "Не удалось проверить доступ к подаче заявки"
-        );
-      } finally {
-        setCheckingAccess(false);
-      }
-    };
-
-    loadAccess();
-  }, [token, navigate]);
-
-  const filteredTypes = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) return SUBSIDY_TYPES;
-
-    return SUBSIDY_TYPES.filter((item) => {
-      return (
-        item.label.toLowerCase().includes(query) ||
-        item.code.toLowerCase().includes(query)
-      );
-    });
-  }, [search]);
-
-  const selectedType = useMemo(() => {
-    return SUBSIDY_TYPES.find((item) => item.code === form.subsidy_type) || null;
-  }, [form.subsidy_type]);
-
-  const canSubmit = Boolean(access?.allowApplication);
-
-  const handleSelectType = (code) => {
-    setForm((prev) => ({
-      ...prev,
-      subsidy_type: code,
-    }));
-
-    setMessage("");
-    setIsError(false);
+  const handleTextChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleNumberChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
-
-    if (!form.subsidy_type) {
-      setIsError(true);
-      setMessage("Выберите тип субсидии");
-      return;
-    }
-
-    if (!canSubmit) {
-      setIsError(true);
-      setMessage("Сейчас подача заявки недоступна");
-      return;
-    }
+    setLoading(true);
+    setServerError("");
+    setResult(null);
 
     try {
-      setSubmitting(true);
-      setIsError(false);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Нет токена. Выполни вход заново.");
+      }
 
-      const payload = {
-        subsidy_type: form.subsidy_type,
-        requested_amount: form.requested_amount ? Number(form.requested_amount) : null,
-        description: form.description.trim() || null,
-      };
+      const payload = normalizePayload(form);
 
-      const res = await axios.post(`${API_URL}/api/subsidy/applications`, payload, {
+      const response = await fetch(`${API_URL}/api/applications`, {
+        method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify(payload),
       });
 
-      setMessage(res.data?.message || "Заявка успешно отправлена");
+      const data = await response.json().catch(() => ({}));
 
-      setForm({
-        subsidy_type: "",
-        requested_amount: "",
-        description: "",
-      });
+      if (!response.ok) {
+        throw new Error(data?.message || data?.detail || "Ошибка при создании заявки");
+      }
 
-      setSearch("");
-    } catch (err) {
-      setIsError(true);
-      setMessage(err.response?.data?.message || "Ошибка отправки заявки");
+      setResult(data?.application || data);
+    } catch (error) {
+      setServerError(error.message || "Ошибка отправки формы");
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.page}>
-      <div style={styles.blurOne}></div>
-      <div style={styles.blurTwo}></div>
-
       <div style={styles.container}>
-        <div style={styles.topBar}>
+        <div style={styles.header}>
           <div>
-            <div style={styles.badge}>SharuAI</div>
             <h1 style={styles.title}>Подача заявки на субсидию</h1>
-            <p style={styles.subtitle}>
-              Выбери вид субсидии по скотоводству и отправь заявку через текущий backend.
-            </p>
+            <p style={styles.subtitle}>Заполни форму и отправь её на оценку модели.</p>
           </div>
 
-          <div style={styles.topBarButtons}>
-            <Link to="/dashboard" style={styles.secondaryLink}>
-              Назад в кабинет
-            </Link>
-          </div>
+          <Link to="/dashboard" style={styles.backButton}>
+            Назад
+          </Link>
         </div>
 
         <div style={styles.layout}>
-          <div style={styles.leftCard}>
-            <h2 style={styles.cardTitle}>Информация о заявителе</h2>
+          <form onSubmit={handleSubmit} style={styles.formCard}>
+            {sections.map((section) => (
+              <div key={section.title} style={styles.section}>
+                <h2 style={styles.sectionTitle}>{section.title}</h2>
 
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Организация</span>
-              <span style={styles.infoValue}>{user?.organization_name || "—"}</span>
-            </div>
+                <div style={styles.grid}>
+                  {section.fields.map((field) => {
+                    const label = labels[field] || field;
 
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>БИН / ИИН</span>
-              <span style={styles.infoValue}>{user?.bin_iin || "—"}</span>
-            </div>
-
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Тип пользователя</span>
-              <span style={styles.infoValue}>{user?.user_type || "—"}</span>
-            </div>
-
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Регион</span>
-              <span style={styles.infoValue}>{user?.region || "—"}</span>
-            </div>
-
-            <div style={{ ...styles.statusBox, ...(access?.allowApplication ? styles.statusOk : styles.statusWarn) }}>
-              <div style={styles.statusTitle}>Статус подачи</div>
-
-              {checkingAccess ? (
-                <div style={styles.statusText}>Проверяем доступ...</div>
-              ) : (
-                <>
-                  <div style={styles.statusText}>
-                    {access?.message || "Статус пока не определен"}
-                  </div>
-
-                  {access?.status && (
-                    <div style={styles.statusCode}>Статус: {access.status}</div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {selectedType && (
-              <div style={styles.selectedTypeBox}>
-                <div style={styles.selectedTypeLabel}>Выбрана субсидия</div>
-                <div style={styles.selectedTypeText}>{selectedType.label}</div>
-                <div style={styles.selectedTypeCode}>{selectedType.code}</div>
-              </div>
-            )}
-          </div>
-
-          <div style={styles.rightCard}>
-            <form onSubmit={handleSubmit}>
-              <h2 style={styles.cardTitle}>Форма заявки</h2>
-
-              <div style={styles.field}>
-                <label style={styles.label}>Поиск типа субсидии</label>
-                <input
-                  type="text"
-                  placeholder="Например: молоко, корма, племенные быки..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>Выбери тип субсидии *</label>
-
-                <div style={styles.subsidyList}>
-                  {filteredTypes.length > 0 ? (
-                    filteredTypes.map((item) => {
-                      const active = form.subsidy_type === item.code;
-
+                    if (field === "application_date") {
                       return (
-                        <button
-                          key={item.code}
-                          type="button"
-                          onClick={() => handleSelectType(item.code)}
-                          style={{
-                            ...styles.subsidyButton,
-                            ...(active ? styles.subsidyButtonActive : {}),
-                          }}
-                        >
-                          <div style={styles.subsidyButtonTitle}>{item.label}</div>
-                          <div style={styles.subsidyButtonCode}>{item.code}</div>
-                        </button>
+                        <div key={field} style={styles.field}>
+                          <label style={styles.label}>{label}</label>
+                          <input
+                            type="date"
+                            value={form[field]}
+                            onChange={(e) => handleTextChange(field, e.target.value)}
+                            style={styles.input}
+                          />
+                        </div>
                       );
-                    })
-                  ) : (
-                    <div style={styles.emptyState}>Ничего не найдено</div>
-                  )}
+                    }
+
+                    if (field === "unmet_obligations_flag") {
+                      return (
+                        <div key={field} style={styles.field}>
+                          <label style={styles.label}>{label}</label>
+                          <select
+                            value={form[field]}
+                            onChange={(e) => handleNumberChange(field, Number(e.target.value))}
+                            style={styles.input}
+                          >
+                            {selectOptions.unmet_obligations_flag.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    if (selectOptions[field]) {
+                      return (
+                        <div key={field} style={styles.field}>
+                          <label style={styles.label}>{label}</label>
+                          <select
+                            value={form[field]}
+                            onChange={(e) => handleTextChange(field, e.target.value)}
+                            style={styles.input}
+                          >
+                            {selectOptions[field].map((option) => (
+                              <option key={option} value={option}>
+                                {option || "Выберите значение"}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={field} style={styles.field}>
+                        <label style={styles.label}>{label}</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={form[field]}
+                          onChange={(e) => handleNumberChange(field, e.target.value)}
+                          style={styles.input}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            ))}
 
-              <div style={styles.field}>
-                <label htmlFor="requested_amount" style={styles.label}>
-                  Запрашиваемая сумма
-                </label>
-                <input
-                  id="requested_amount"
-                  type="number"
-                  min="0"
-                  name="requested_amount"
-                  value={form.requested_amount}
-                  onChange={handleChange}
-                  placeholder="Например: 2500000"
-                  style={styles.input}
-                />
-              </div>
+            <button type="submit" style={styles.submitButton} disabled={loading}>
+              {loading ? "Отправка..." : "Отправить модели для оценки"}
+            </button>
 
-              <div style={styles.field}>
-                <label htmlFor="description" style={styles.label}>
-                  Описание / комментарий
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder="Кратко опиши цель подачи заявки"
-                  style={styles.textarea}
-                />
-              </div>
+            {serverError ? <div style={styles.errorBox}>{serverError}</div> : null}
+          </form>
 
-              {message && (
+          <div style={styles.resultCard}>
+            <h2 style={styles.resultTitle}>Результат</h2>
+
+            {!result ? (
+              <p style={styles.emptyText}>После отправки здесь появится итог заявки.</p>
+            ) : (
+              <>
+                <div style={styles.metricCard}>
+                  <div style={styles.metricLabel}>Score</div>
+                  <div style={styles.metricValue}>{result.score ?? "—"}</div>
+                </div>
+
                 <div
                   style={{
-                    ...styles.message,
-                    ...(isError ? styles.messageError : styles.messageSuccess),
+                    ...styles.priorityBox,
+                    color: getPriorityColor(result.priority),
+                    borderColor: getPriorityColor(result.priority),
                   }}
                 >
-                  {message}
+                  Приоритет: {priorityLabel(result.priority)}
                 </div>
-              )}
 
-              <div style={styles.formActions}>
-                <button
-                  type="submit"
-                  disabled={submitting || checkingAccess || !canSubmit}
-                  style={{
-                    ...styles.submitButton,
-                    ...(submitting || checkingAccess || !canSubmit
-                      ? styles.submitButtonDisabled
-                      : {}),
-                  }}
-                >
-                  {submitting ? "Отправка..." : "Отправить заявку"}
-                </button>
-              </div>
-            </form>
+                <div style={styles.block}>
+                  <h3 style={styles.blockTitle}>Рекомендация</h3>
+                  <p style={styles.blockText}>{result.recommendation || "—"}</p>
+                </div>
+
+                <div style={styles.block}>
+                  <h3 style={styles.blockTitle}>Риски</h3>
+                  {Array.isArray(result.riskFlags) && result.riskFlags.length > 0 ? (
+                    <ul style={styles.list}>
+                      {result.riskFlags.map((flag, index) => (
+                        <li key={index}>{flag}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={styles.blockText}>Нет</p>
+                  )}
+                </div>
+
+                <div style={styles.block}>
+                  <h3 style={styles.blockTitle}>Статус</h3>
+                  <p style={styles.blockText}>{result.status || "NEW"}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -404,300 +417,35 @@ export default function SubsidyApplication() {
 }
 
 const styles = {
-  page: {
-    minHeight: "100vh",
-    position: "relative",
-    overflow: "hidden",
-    padding: "40px 20px",
-    background: "linear-gradient(135deg, #0f172a 0%, #172554 35%, #2563eb 100%)",
-    fontFamily: "Inter, Arial, sans-serif",
+  page: { minHeight: "100vh", background: "#f6f8fb", padding: 24 },
+  container: { maxWidth: 1400, margin: "0 auto" },
+  header: { display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" },
+  title: { margin: 0, fontSize: 32, fontWeight: 800 },
+  subtitle: { marginTop: 8, color: "#6b7280" },
+  backButton: {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    padding: "12px 16px", borderRadius: 12, textDecoration: "none",
+    background: "#2563eb", color: "#fff", fontWeight: 700
   },
-  blurOne: {
-    position: "absolute",
-    width: 320,
-    height: 320,
-    borderRadius: "50%",
-    background: "#38bdf8",
-    filter: "blur(80px)",
-    opacity: 0.25,
-    top: -60,
-    left: -80,
-  },
-  blurTwo: {
-    position: "absolute",
-    width: 360,
-    height: 360,
-    borderRadius: "50%",
-    background: "#8b5cf6",
-    filter: "blur(80px)",
-    opacity: 0.25,
-    right: -120,
-    bottom: -100,
-  },
-  container: {
-    position: "relative",
-    zIndex: 1,
-    maxWidth: 1280,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 20,
-    alignItems: "flex-start",
-    marginBottom: 24,
-    flexWrap: "wrap",
-  },
-  topBarButtons: {
-    display: "flex",
-    gap: 12,
-  },
-  badge: {
-    display: "inline-flex",
-    padding: "8px 14px",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.14)",
-    border: "1px solid rgba(255,255,255,0.16)",
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 700,
-    textTransform: "uppercase",
-    marginBottom: 18,
-  },
-  title: {
-    margin: "0 0 8px",
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: 800,
-  },
-  subtitle: {
-    margin: 0,
-    maxWidth: 720,
-    color: "rgba(255,255,255,0.82)",
-    lineHeight: 1.6,
-    fontSize: 16,
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "0.9fr 1.1fr",
-    gap: 20,
-  },
-  leftCard: {
-    background: "rgba(255,255,255,0.92)",
-    borderRadius: 24,
-    padding: 24,
-    boxShadow: "0 30px 80px rgba(0, 0, 0, 0.22)",
-    alignSelf: "start",
-  },
-  rightCard: {
-    background: "rgba(255,255,255,0.92)",
-    borderRadius: 24,
-    padding: 24,
-    boxShadow: "0 30px 80px rgba(0, 0, 0, 0.22)",
-  },
-  cardTitle: {
-    margin: "0 0 18px",
-    fontSize: 24,
-    fontWeight: 800,
-    color: "#0f172a",
-  },
-  infoRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    padding: "14px 0",
-    borderBottom: "1px solid #e2e8f0",
-    flexWrap: "wrap",
-  },
-  infoLabel: {
-    color: "#64748b",
-    fontSize: 14,
-    fontWeight: 600,
-  },
-  infoValue: {
-    color: "#0f172a",
-    fontSize: 15,
-    fontWeight: 700,
-  },
-  statusBox: {
-    marginTop: 20,
-    borderRadius: 18,
-    padding: 16,
-    border: "1px solid transparent",
-  },
-  statusOk: {
-    background: "#ecfdf5",
-    borderColor: "#a7f3d0",
-  },
-  statusWarn: {
-    background: "#fff7ed",
-    borderColor: "#fdba74",
-  },
-  statusTitle: {
-    fontSize: 13,
-    fontWeight: 800,
-    color: "#0f172a",
-    marginBottom: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    lineHeight: 1.6,
-    color: "#334155",
-  },
-  statusCode: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#475569",
-  },
-  selectedTypeBox: {
-    marginTop: 20,
-    borderRadius: 18,
-    padding: 16,
-    background: "#eff6ff",
-    border: "1px solid #bfdbfe",
-  },
-  selectedTypeLabel: {
-    fontSize: 12,
-    fontWeight: 800,
-    color: "#1d4ed8",
-    marginBottom: 8,
-    textTransform: "uppercase",
-  },
-  selectedTypeText: {
-    fontSize: 15,
-    lineHeight: 1.6,
-    color: "#0f172a",
-    fontWeight: 700,
-  },
-  selectedTypeCode: {
-    marginTop: 8,
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: 700,
-  },
-  field: {
-    marginBottom: 18,
-  },
-  label: {
-    display: "block",
-    marginBottom: 8,
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#334155",
-  },
-  input: {
-    width: "100%",
-    minHeight: 54,
-    padding: "0 16px",
-    borderRadius: 16,
-    border: "1px solid #dbe4f0",
-    background: "#f8fafc",
-    fontSize: 15,
-    color: "#0f172a",
-    outline: "none",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 120,
-    padding: "14px 16px",
-    borderRadius: 16,
-    border: "1px solid #dbe4f0",
-    background: "#f8fafc",
-    fontSize: 15,
-    color: "#0f172a",
-    outline: "none",
-    resize: "vertical",
-    fontFamily: "inherit",
-  },
-  subsidyList: {
-    maxHeight: 360,
-    overflowY: "auto",
-    border: "1px solid #e2e8f0",
-    borderRadius: 18,
-    padding: 12,
-    background: "#f8fafc",
-  },
-  subsidyButton: {
-    width: "100%",
-    textAlign: "left",
-    border: "1px solid #e2e8f0",
-    borderRadius: 16,
-    background: "#fff",
-    padding: 14,
-    cursor: "pointer",
-    marginBottom: 10,
-  },
-  subsidyButtonActive: {
-    borderColor: "#2563eb",
-    background: "#eff6ff",
-  },
-  subsidyButtonTitle: {
-    fontSize: 14,
-    lineHeight: 1.55,
-    color: "#0f172a",
-    fontWeight: 700,
-    marginBottom: 6,
-  },
-  subsidyButtonCode: {
-    fontSize: 12,
-    color: "#64748b",
-    fontWeight: 700,
-  },
-  emptyState: {
-    padding: 18,
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: 14,
-  },
-  message: {
-    marginTop: 10,
-    padding: "14px 16px",
-    borderRadius: 14,
-    fontSize: 14,
-    lineHeight: 1.5,
-  },
-  messageError: {
-    background: "#fef2f2",
-    color: "#b91c1c",
-    border: "1px solid #fecaca",
-  },
-  messageSuccess: {
-    background: "#ecfdf5",
-    color: "#047857",
-    border: "1px solid #a7f3d0",
-  },
-  formActions: {
-    marginTop: 22,
-  },
-  submitButton: {
-    width: "100%",
-    minHeight: 56,
-    border: "none",
-    borderRadius: 16,
-    background: "linear-gradient(135deg, #2563eb, #7c3aed)",
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 16px 30px rgba(79, 70, 229, 0.28)",
-  },
-  submitButtonDisabled: {
-    opacity: 0.65,
-    cursor: "not-allowed",
-  },
-  secondaryLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-    padding: "0 18px",
-    borderRadius: 16,
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.25)",
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: 700,
-    textDecoration: "none",
-  },
+  layout: { display: "grid", gridTemplateColumns: "1.4fr 0.9fr", gap: 20 },
+  formCard: { background: "#fff", borderRadius: 18, padding: 24, border: "1px solid #e5e7eb" },
+  resultCard: { background: "#fff", borderRadius: 18, padding: 24, border: "1px solid #e5e7eb", height: "fit-content", position: "sticky", top: 20 },
+  section: { marginBottom: 24, paddingBottom: 18, borderBottom: "1px solid #e5e7eb" },
+  sectionTitle: { margin: "0 0 14px", fontSize: 22, fontWeight: 800 },
+  grid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 },
+  field: { display: "flex", flexDirection: "column", gap: 8 },
+  label: { fontWeight: 700, fontSize: 14, color: "#374151" },
+  input: { minHeight: 46, borderRadius: 12, border: "1px solid #d1d5db", padding: "0 12px", fontSize: 14, background: "#fff" },
+  submitButton: { width: "100%", minHeight: 52, border: "none", borderRadius: 14, background: "#2563eb", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer" },
+  errorBox: { marginTop: 16, padding: 14, borderRadius: 12, background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", fontWeight: 700 },
+  resultTitle: { margin: "0 0 18px", fontSize: 24, fontWeight: 800 },
+  emptyText: { color: "#6b7280" },
+  metricCard: { borderRadius: 16, padding: 18, background: "#eff6ff", border: "1px solid #bfdbfe", marginBottom: 14 },
+  metricLabel: { color: "#1d4ed8", fontWeight: 700, marginBottom: 8 },
+  metricValue: { fontSize: 42, fontWeight: 900 },
+  priorityBox: { border: "2px solid", borderRadius: 12, padding: 12, fontWeight: 800, marginBottom: 16 },
+  block: { marginTop: 18, paddingTop: 18, borderTop: "1px solid #e5e7eb" },
+  blockTitle: { margin: "0 0 10px", fontSize: 18, fontWeight: 800 },
+  blockText: { margin: 0, color: "#374151", lineHeight: 1.6 },
+  list: { margin: 0, paddingLeft: 18 },
 };

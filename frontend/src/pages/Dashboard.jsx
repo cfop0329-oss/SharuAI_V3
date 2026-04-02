@@ -21,13 +21,17 @@ export default function Dashboard() {
             <div style={styles.badge}>SharuAI</div>
             <h1 style={styles.title}>Личный кабинет</h1>
             <p style={styles.subtitle}>
-              Здесь можно посмотреть данные пользователя и подать заявку на субсидию.
+              Здесь можно посмотреть данные пользователя, подать заявку и открыть очередь эксперта.
             </p>
           </div>
 
           <div style={styles.actions}>
             <Link to="/subsidy-application" style={styles.primaryButton}>
               Подать заявку
+            </Link>
+
+            <Link to="/expert-queue" style={styles.queueButton}>
+              Очередь эксперта
             </Link>
 
             <button type="button" onClick={handleLogout} style={styles.secondaryButton}>
@@ -73,15 +77,21 @@ export default function Dashboard() {
             </div>
 
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Быстрое действие</h2>
+              <h2 style={styles.cardTitle}>Быстрые действия</h2>
               <p style={styles.cardText}>
-                Открой страницу подачи заявки, выбери вид субсидии по скотоводству,
-                укажи сумму и отправь данные в backend.
+                Сначала можно заполнить форму субсидии и отправить её модели. После этого заявка
+                попадёт в очередь эксперта вместе с score, приоритетом, рисками и рекомендацией.
               </p>
 
-              <Link to="/subsidy-application" style={styles.bigLinkButton}>
-                Перейти к форме субсидии
-              </Link>
+              <div style={styles.quickActions}>
+                <Link to="/subsidy-application" style={styles.bigLinkButton}>
+                  Перейти к форме субсидии
+                </Link>
+
+                <Link to="/expert-queue" style={styles.bigQueueButton}>
+                  Открыть очередь эксперта
+                </Link>
+              </div>
             </div>
           </div>
         ) : (
@@ -166,7 +176,7 @@ const styles = {
   },
   subtitle: {
     margin: 0,
-    maxWidth: 640,
+    maxWidth: 680,
     color: "rgba(255,255,255,0.82)",
     lineHeight: 1.6,
     fontSize: 16,
@@ -187,6 +197,17 @@ const styles = {
     textDecoration: "none",
     cursor: "pointer",
     boxShadow: "0 16px 30px rgba(79, 70, 229, 0.28)",
+  },
+  queueButton: {
+    border: "none",
+    borderRadius: 16,
+    background: "#0f766e",
+    color: "#fff",
+    padding: "14px 20px",
+    fontSize: 15,
+    fontWeight: 700,
+    textDecoration: "none",
+    cursor: "pointer",
   },
   secondaryButton: {
     border: "1px solid rgba(255,255,255,0.25)",
@@ -239,6 +260,11 @@ const styles = {
     fontSize: 15,
     fontWeight: 700,
   },
+  quickActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
   bigLinkButton: {
     display: "inline-flex",
     alignItems: "center",
@@ -249,6 +275,19 @@ const styles = {
     background: "#eff6ff",
     border: "1px solid #bfdbfe",
     color: "#1d4ed8",
+    fontWeight: 700,
+    textDecoration: "none",
+  },
+  bigQueueButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
+    padding: "0 18px",
+    borderRadius: 16,
+    background: "#ecfeff",
+    border: "1px solid #99f6e4",
+    color: "#0f766e",
     fontWeight: 700,
     textDecoration: "none",
   },
