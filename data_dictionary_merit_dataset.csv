@@ -1,0 +1,62 @@
+﻿column_name,source_type,role,description_ru
+record_no,real_or_derived_from_uploaded_file,id,Реальный номер строки из выгрузки
+application_id,real_or_derived_from_uploaded_file,id,Реальный номер заявки из выгрузки
+application_received_at,real_or_derived_from_uploaded_file,feature,Реальная дата/время поступления заявки
+application_date,derived_from_uploaded_file,feature,Дата заявки (derived)
+year,derived_from_uploaded_file,feature,Год из даты заявки (derived)
+month,derived_from_uploaded_file,feature,Месяц из даты заявки (derived)
+quarter,derived_from_uploaded_file,feature,Квартал из даты заявки (derived)
+day_of_year,derived_from_uploaded_file,feature,Порядковый день года (derived)
+application_hour,derived_from_uploaded_file,feature,Час подачи заявки (derived)
+region,real_or_derived_from_uploaded_file,feature,Реальная область
+district,real_or_derived_from_uploaded_file,feature,Реальный район хозяйства
+akimat,real_or_derived_from_uploaded_file,feature,Реальный акимат/управление
+direction,real_or_derived_from_uploaded_file,feature,Реальное направление субсидирования
+species,derived_from_uploaded_file,feature,Синтетически выведенный вид хозяйства из текста направления/программы
+subsidy_program,real_or_derived_from_uploaded_file,feature,Реальное наименование субсидирования
+application_status,real_or_derived_from_uploaded_file,feature,Реальный статус заявки
+normative_kzt_per_unit,real_or_derived_from_uploaded_file,feature,Реальный норматив
+entitled_amount_kzt,real_or_derived_from_uploaded_file,feature,Реальная причитающая сумма
+subsidized_units_est,derived_from_uploaded_file,feature,Derived: entitled_amount / normative
+producer_id,synthetic,id,Синтетический anonymized producer_id; один и тот же ID объединяет историю заявок одного хозяйства
+producer_type,synthetic,feature,Синтетический тип хозяйства (family_farm / farm_cooperative / llp / agroholding_llp)
+years_in_operation,synthetic,feature,Синтетический стаж хозяйства в годах
+employees_count,synthetic,feature,Синтетическая численность работников
+land_area_ha,synthetic,feature,"Синтетическая площадь земли, га"
+herd_size_head,synthetic,feature,Синтетическое поголовье
+output_volume_tons,synthetic,feature,Синтетический объем выпуска
+productivity_index,synthetic,feature,Синтетический индекс продуктивности
+revenue_kzt,synthetic,feature,Синтетическая выручка
+ebitda_margin_pct,synthetic,feature,"Синтетическая EBITDA margin, доля 0-1"
+debt_to_revenue_pct,synthetic,feature,"Синтетическая долговая нагрузка к выручке, доля 0-1"
+prior_subsidies_count_3y,synthetic,feature,Синтетическая история прошлых субсидий: количество за 3 года
+prior_subsidies_amount_kzt_3y,synthetic,feature,Синтетическая история прошлых субсидий: сумма за 3 года
+prior_violations_count_3y,synthetic,feature,Синтетическое количество нарушений за 3 года
+prior_refunds_count_3y,synthetic,feature,Синтетическое количество возвратов/корректировок за 3 года
+prior_refunds_amount_kzt_3y,synthetic,feature,Синтетическая сумма возвратов за 3 года
+unmet_obligations_flag,synthetic,feature,Синтетический флаг невыполнения обязательств
+prior_avg_output_growth_pct,synthetic,feature,Синтетический средний рост выпуска до текущей заявки
+prior_avg_revenue_growth_pct,synthetic,feature,Синтетический средний рост выручки до текущей заявки
+producer_application_seq_no,synthetic,feature,Порядковый номер заявки внутри synthetic producer_id
+past_applications_count,synthetic,feature,Количество прошлых заявок данного producer_id до текущей даты
+past_approved_count,synthetic,feature,Количество прошлых approved-like заявок
+past_rejected_count,synthetic,feature,Количество прошлых отказов
+past_withdrawn_count,synthetic,feature,Количество прошлых отзывов
+past_paid_amount_kzt,synthetic,feature,Сумма прошлых approved-like заявок
+past_avg_entitled_amount_kzt,synthetic,feature,Средняя сумма прошлых заявок
+region_execution_rate_real,derived_from_uploaded_file,feature,Реальная доля approved-like заявок по области
+district_execution_rate_real,derived_from_uploaded_file,feature,Реальная доля approved-like заявок по району
+direction_execution_rate_real,derived_from_uploaded_file,feature,Реальная доля approved-like заявок по направлению
+program_execution_rate_real,derived_from_uploaded_file,feature,Реальная доля approved-like заявок по программе
+need_score,synthetic,label_or_feature,Синтетический need score 0-100
+impact_score,synthetic,label_or_feature,Синтетический impact score 0-100
+compliance_score,synthetic,label_or_feature,Синтетический compliance score 0-100
+merit_score,synthetic,label,Синтетический итоговый merit score 0-100
+shortlist_bucket,synthetic,label,Синтетический результат ранжирования
+merit_recommended_flag,synthetic,label,"1, если рекомендован в shortlist"
+post_effect_output_growth_pct,synthetic,label,Синтетический post-effect: рост выпуска после субсидии
+post_effect_revenue_growth_pct,synthetic,label,Синтетический post-effect: рост выручки после субсидии
+post_effect_productivity_growth_pct,synthetic,label,Синтетический post-effect: рост продуктивности после субсидии
+post_effect_compliance_flag,synthetic,label,Синтетический флаг соблюдения обязательств после субсидии
+outcome_effective_flag,synthetic,label,Синтетический бинарный outcome эффективности
+data_origin,synthetic,meta,Маркер происхождения: real_base+synthetic_enrichment
