@@ -8,8 +8,8 @@ datasource db {
 }
 
 model User {
-  id                   String   @id @default(uuid())
-  bin_iin              String   @unique
+  id                   Int           @id @default(autoincrement())
+  bin_iin              String        @unique
   user_type            String
   org_form             String
   organization_name    String
@@ -21,67 +21,40 @@ model User {
   locality             String?
   phone                String?
   postal_address       String?
-  email                String   @unique
+  email                String        @unique
   password_hash        String
   certificate_file_url String?
-  created_at           DateTime @default(now())
-}
-generator client {
-  provider = "prisma-client-js"
-}
+  createdAt            DateTime      @default(now())
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  applications         Application[]
 }
 
-model User {
-  id                   String              @id @default(uuid())
-  bin_iin              String              @unique
-  user_type            String
-  org_form             String
-  organization_name    String
-  registration_date    DateTime?
-  director             String
-  region               String
-  district             String?
-  rural_district       String?
-  locality             String?
-  phone                String?
-  postal_address       String?
-  email                String              @unique
-  password_hash        String
-  certificate_file_url String?
-  created_at           DateTime            @default(now())
+model Application {
+  id                         Int      @id @default(autoincrement())
+  userId                     Int
+  applicantName              String
+  region                     String
+  subsidyProgram             String
+  requestedAmount            Float
+  landAreaHa                 Float?
+  employeesCount             Int?
+  annualRevenue              Float?
+  taxDebt                    Float?   @default(0)
+  creditDebt                 Float?   @default(0)
+  priorViolationsCount3y     Int?     @default(0)
+  priorRefundsCount3y        Int?     @default(0)
+  pastApplicationsCount      Int?     @default(0)
+  approvedSubsidiesCount     Int?     @default(0)
 
-  subsidy_applications SubsidyApplication[]
-  counter_obligations  CounterObligation[]
-}
+  score                      Float?
+  priority                   String?
+  riskFlags                  Json?
+  recommendation             String?
+  explanation                String?
 
-model SubsidyApplication {
-  id               String   @id @default(uuid())
-  user_id          String
-  subsidy_type     String
-  requested_amount Float?
-  description      String?
-  status           String   @default("submitted")
-  created_at       DateTime @default(now())
+  status                     String   @default("NEW") // NEW, REVIEW, APPROVED, REJECTED
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-}
-
-model CounterObligation {
-  id                     String   @id @default(uuid())
-  user_id                String
-  subsidy_year           Int
-  subsidy_amount         Float?
-  obligation_description String
-  planned_value          Float?
-  actual_value           Float?
-  status                 String   @default("filled_manually")
-  notes                  String?
-  source                 String   @default("manual")
-  created_at             DateTime @default(now())
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

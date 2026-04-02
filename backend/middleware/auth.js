@@ -9,13 +9,13 @@ export function authMiddleware(req, res, next) {
     }
 
     const token = authHeader.split(" ")[1];
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
       bin_iin: decoded.bin_iin,
-      user_type: decoded.user_type,
     };
 
     next();
