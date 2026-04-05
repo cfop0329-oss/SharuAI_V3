@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -36,7 +37,7 @@ export default function Login() {
       setLoading(true);
       setIsError(false);
 
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await axios.post(`${API_URL}/api/auth/login`, {
         bin_iin: form.bin_iin,
         password: form.password,
       });
