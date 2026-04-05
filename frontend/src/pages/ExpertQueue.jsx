@@ -42,7 +42,16 @@ function normalizeApplications(data) {
 
 function normalizeRiskFlags(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
-  if (typeof value === "string" && value.trim()) return [value.trim()];
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch {}
+
+    return [value.trim()];
+  }
+
   return [];
 }
 
@@ -94,11 +103,13 @@ function normalizeApplication(app) {
       ) || "Не указана",
 
     requestedAmount: pickFirst(
-      app?.requestedAmount,
-      app?.requested_amount,
-      app?.amount,
-      app?.sum
-    ),
+    app?.requestedAmount,
+    app?.requested_amount,
+    app?.amount,
+    app?.sum,
+    app?.entitledAmountKzt,
+    app?.entitled_amount_kzt
+  ),
 
     score: pickFirst(
       app?.score,
@@ -213,12 +224,12 @@ export default function ExpertQueue() {
       }
 
       const [appsRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/applications/queue`, {
+        fetch(`${API_URL}/api/ml-applications/queue`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }),
-        fetch(`${API_URL}/api/applications/stats`, {
+        fetch(`${API_URL}/api/ml-applications/stats`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -289,7 +300,7 @@ export default function ExpertQueue() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/api/applications/${id}/status`, {
+      const res = await fetch(`${API_URL}/api/ml-applications/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

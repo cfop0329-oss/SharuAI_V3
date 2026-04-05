@@ -8,8 +8,8 @@ datasource db {
 }
 
 model User {
-  id                   Int           @id @default(autoincrement())
-  bin_iin              String        @unique
+  id                   Int                    @id @default(autoincrement())
+  bin_iin              String                 @unique
   user_type            String
   org_form             String
   organization_name    String
@@ -21,40 +21,95 @@ model User {
   locality             String?
   phone                String?
   postal_address       String?
-  email                String        @unique
+  email                String                 @unique
   password_hash        String
   certificate_file_url String?
-  createdAt            DateTime      @default(now())
+  createdAt            DateTime               @default(now())
 
   applications         Application[]
+  mlSubsidyApplications MlSubsidyApplication[]
 }
 
 model Application {
-  id                         Int      @id @default(autoincrement())
-  userId                     Int
-  applicantName              String
-  region                     String
-  subsidyProgram             String
-  requestedAmount            Float
-  landAreaHa                 Float?
-  employeesCount             Int?
-  annualRevenue              Float?
-  taxDebt                    Float?   @default(0)
-  creditDebt                 Float?   @default(0)
-  priorViolationsCount3y     Int?     @default(0)
-  priorRefundsCount3y        Int?     @default(0)
-  pastApplicationsCount      Int?     @default(0)
-  approvedSubsidiesCount     Int?     @default(0)
-
-  score                      Float?
-  priority                   String?
-  riskFlags                  Json?
-  recommendation             String?
-  explanation                String?
-
-  status                     String   @default("NEW") // NEW, REVIEW, APPROVED, REJECTED
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                       Int       @id @default(autoincrement())
+  userId                   Int
+  applicantName            String
+  region                   String
+  subsidyProgram           String
+  requestedAmount          Float
+  landAreaHa               Float?
+  employeesCount           Int?
+  annualRevenue            Float?
+  taxDebt                  Float?   @default(0)
+  creditDebt               Float?   @default(0)
+  priorViolationsCount3y   Int?     @default(0)
+  priorRefundsCount3y      Int?     @default(0)
+  pastApplicationsCount    Int?     @default(0)
+  approvedSubsidiesCount   Int?     @default(0)
+  score                    Float?
+  priority                 String?
+  riskFlags                Json?
+  recommendation           String?
+  explanation              String?
+  status                   String   @default("NEW")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MlSubsidyApplication {
+  id                           Int       @id @default(autoincrement())
+  userId                       Int
+
+  applicationDate              DateTime?
+  region                       String?
+  district                     String?
+  akimat                       String?
+  direction                    String?
+  species                      String?
+  subsidyProgram               String?
+  producerType                 String?
+
+  entitledAmountKzt            Float     @default(0)
+  subsidizedUnitsEst           Float     @default(0)
+  yearsInOperation             Int       @default(0)
+  employeesCount               Int       @default(0)
+  landAreaHa                   Float     @default(0)
+  herdSizeHead                 Float     @default(0)
+  outputVolumeTons             Float     @default(0)
+  productivityIndex            Float     @default(0)
+  revenueKzt                   Float     @default(0)
+  ebitdaMarginPct              Float     @default(0)
+  debtToRevenuePct             Float     @default(0)
+
+  priorSubsidiesCount3y        Int       @default(0)
+  priorSubsidiesAmountKzt3y    Float     @default(0)
+  priorViolationsCount3y       Int       @default(0)
+  priorRefundsCount3y          Int       @default(0)
+  priorRefundsAmountKzt3y      Float     @default(0)
+  unmetObligationsFlag         Int       @default(0)
+
+  pastApplicationsCount        Int       @default(0)
+  pastApprovedCount            Int       @default(0)
+  pastRejectedCount            Int       @default(0)
+  pastWithdrawnCount           Int       @default(0)
+  pastPaidAmountKzt            Float     @default(0)
+
+  score                        Float?
+  priority                     String?
+  recommendation               String?
+  riskFlags                    Json?
+  rawPayload                   Json?
+  status                       String    @default("NEW")
+
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
 }

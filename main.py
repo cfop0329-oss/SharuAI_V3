@@ -4,7 +4,7 @@ from typing import Any, Optional
 import joblib
 import pandas as pd
 from catboost import CatBoostRegressor
-from fastapi import FastAPI, Header
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -22,11 +22,18 @@ print("CATEGORICAL_COLS_PATH:", CATEGORICAL_COLS_PATH, CATEGORICAL_COLS_PATH.exi
 print("DEFAULT_VALUES_PATH:", DEFAULT_VALUES_PATH, DEFAULT_VALUES_PATH.exists())
 print("CATEGORY_OPTIONS_PATH:", CATEGORY_OPTIONS_PATH, CATEGORY_OPTIONS_PATH.exists())
 
-app = FastAPI(title="SharuAI API")
+app = FastAPI(title="SharuAI ML API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5173","http://127.0.0.1:5173","http://localhost:5174","http://127.0.0.1:5174"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,13 +85,6 @@ class ApplicationInput(BaseModel):
     past_paid_amount_kzt: float = 0
 
 
-class StatusUpdate(BaseModel):
-    status: str
-
-
-APPLICATIONS = []
-
-
 def safe_str(x: Any) -> str:
     if x is None:
         return ""
@@ -118,7 +118,6 @@ def build_input_df(data: ApplicationInput) -> pd.DataFrame:
         if "day_of_year" in model_columns:
             row["day_of_year"] = int(dt.dayofyear)
 
-    # перенос полей формы
     field_map = {
         "region": "region",
         "district": "district",
@@ -155,8 +154,8 @@ def build_input_df(data: ApplicationInput) -> pd.DataFrame:
     }
 
     for source_key, target_key in field_map.items():
-      if target_key in row:
-          row[target_key] = payload.get(source_key, row[target_key])
+        if target_key in row:
+            row[target_key] = payload.get(source_key, row[target_key])
 
     df = pd.DataFrame([row]).reindex(columns=model_columns)
 
@@ -203,32 +202,21 @@ def get_recommendation(priority: str, risk_flags: list[str]) -> str:
     return "Передать эксперту на рассмотрение"
 
 
-@app.get("/")
-def root():
-    return {"message": "SharuAI API работает"}
-
-
-@app.post("/api/applications")
-def create_application(data: ApplicationInput, authorization: str | None = Header(default=None)):
-    # для демо user берём из заглушки
-    # потом заменишь на реальную авторизацию и БД
-    current_user = {
-        "organization_name": "Demo Organization",
-        "email": "demo@mail.com",
-        "bin_iin": "000000000000",
-    }
-
+def build_scored_result(data: ApplicationInput) -> dict:
     df = build_input_df(data)
     score = float(model.predict(df)[0])
     priority = get_priority(score)
     risk_flags = build_risk_flags(data)
     recommendation = get_recommendation(priority, risk_flags)
 
-    application = {
-        "id": len(APPLICATIONS) + 1,
-        "user": current_user,
+    return {
         "region": data.region,
+        "district": data.district,
+        "akimat": data.akimat,
+        "direction": data.direction,
+        "species": data.species,
         "subsidyProgram": data.subsidy_program,
+        "producerType": data.producer_type,
         "requestedAmount": data.entitled_amount_kzt,
         "score": round(score, 2),
         "priority": priority,
@@ -238,52 +226,15 @@ def create_application(data: ApplicationInput, authorization: str | None = Heade
         "rawPayload": data.model_dump(),
     }
 
-    APPLICATIONS.insert(0, application)
 
+@app.get("/")
+def root():
+    return {"message": "SharuAI ML API работает"}
+
+
+@app.post("/api/ml/score")
+def score_application_only(data: ApplicationInput):
     return {
-        "message": "Заявка создана",
-        "application": application
+        "message": "Скоринг рассчитан",
+        "application": build_scored_result(data),
     }
-
-
-@app.get("/api/applications/queue")
-def get_queue(authorization: str | None = Header(default=None)):
-    return {"applications": APPLICATIONS}
-
-
-@app.get("/api/applications/stats")
-def get_stats(authorization: str | None = Header(default=None)):
-    total = len(APPLICATIONS)
-    high = sum(1 for a in APPLICATIONS if a["priority"] == "HIGH")
-    medium = sum(1 for a in APPLICATIONS if a["priority"] == "MEDIUM")
-    low = sum(1 for a in APPLICATIONS if a["priority"] == "LOW")
-    review_needed = sum(1 for a in APPLICATIONS if len(a["riskFlags"]) > 0)
-
-    scores = [a["score"] for a in APPLICATIONS if a.get("score") is not None]
-    avg_score = round(sum(scores) / len(scores), 2) if scores else 0
-
-    return {
-        "total": total,
-        "high": high,
-        "medium": medium,
-        "low": low,
-        "reviewNeeded": review_needed,
-        "avgScore": avg_score,
-    }
-
-
-@app.patch("/api/applications/{application_id}/status")
-def update_application_status(
-    application_id: int,
-    data: StatusUpdate,
-    authorization: str | None = Header(default=None),
-):
-    for app_item in APPLICATIONS:
-        if app_item["id"] == application_id:
-            app_item["status"] = data.status
-            return {
-                "message": "Статус обновлён",
-                "application": app_item
-            }
-
-    return {"message": "Заявка не найдена"}
