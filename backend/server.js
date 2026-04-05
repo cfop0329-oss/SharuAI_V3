@@ -56,11 +56,43 @@ const upload = multer({
 });
 
 function requireExpert(req, res, next) {
-  const allowedRoles = ["EXPERT", "ADMIN", "expert", "admin"];
-  if (!req.user || !allowedRoles.includes(req.user.user_type)) {
-    return res.status(403).json({ message: "Доступ только для эксперта или администратора" });
+  const currentType = String(req.user?.user_type || "").toUpperCase();
+
+  if (currentType === "ADMIN" || currentType === "EXPERT") {
+    return next();
   }
-  next();
+
+  return res.status(403).json({
+    message: "Доступ только для эксперта или администратора",
+  });
+}
+
+function buildTokenPayload(user) {
+  return {
+    userId: user.id,
+    email: user.email,
+    bin_iin: user.bin_iin,
+    user_type: user.user_type,
+  };
+}
+
+function buildPublicUser(user) {
+  return {
+    id: user.id,
+    bin_iin: user.bin_iin,
+    email: user.email,
+    organization_name: user.organization_name,
+    user_type: user.user_type,
+    org_form: user.org_form,
+    director: user.director,
+    region: user.region,
+    district: user.district,
+    rural_district: user.rural_district,
+    locality: user.locality,
+    phone: user.phone,
+    postal_address: user.postal_address,
+    certificate_file_url: user.certificate_file_url,
+  };
 }
 
 function priorityRank(priority) {
@@ -144,12 +176,7 @@ app.post("/api/auth/register", upload.single("certificate"), async (req, res) =>
     });
 
     const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        bin_iin: user.bin_iin,
-        user_type: user.user_type,
-      },
+      buildTokenPayload(user),
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -157,15 +184,10 @@ app.post("/api/auth/register", upload.single("certificate"), async (req, res) =>
     res.status(201).json({
       message: "Регистрация успешна",
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        organization_name: user.organization_name,
-        user_type: user.user_type,
-      },
+      user: buildPublicUser(user),
     });
   } catch (error) {
-    console.error(error);
+    console.error("REGISTER ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
@@ -193,12 +215,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        bin_iin: user.bin_iin,
-        user_type: user.user_type,
-      },
+      buildTokenPayload(user),
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -206,20 +223,14 @@ app.post("/api/auth/login", async (req, res) => {
     res.json({
       message: "Вход выполнен успешно",
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        organization_name: user.organization_name,
-        user_type: user.user_type,
-      },
+      user: buildPublicUser(user),
     });
   } catch (error) {
-    console.error(error);
+    console.error("LOGIN ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
 
-// Создание заявки + автоматический скоринг
 app.post("/api/applications", authMiddleware, async (req, res) => {
   try {
     const {
@@ -238,7 +249,14 @@ app.post("/api/applications", authMiddleware, async (req, res) => {
       approvedSubsidiesCount,
     } = req.body;
 
-    if (!applicantName || !region || !subsidyProgram || requestedAmount === undefined || requestedAmount === null || requestedAmount === "") {
+    if (
+      !applicantName ||
+      !region ||
+      !subsidyProgram ||
+      requestedAmount === undefined ||
+      requestedAmount === null ||
+      requestedAmount === ""
+    ) {
       return res.status(400).json({
         message: "Заполните обязательные поля заявки",
       });
@@ -264,11 +282,26 @@ app.post("/api/applications", authMiddleware, async (req, res) => {
         region,
         subsidyProgram,
         requestedAmount: Number(requestedAmount),
-        landAreaHa: landAreaHa !== undefined && landAreaHa !== "" ? Number(landAreaHa) : null,
-        employeesCount: employeesCount !== undefined && employeesCount !== "" ? Number(employeesCount) : null,
-        annualRevenue: annualRevenue !== undefined && annualRevenue !== "" ? Number(annualRevenue) : null,
-        taxDebt: taxDebt !== undefined && taxDebt !== "" ? Number(taxDebt) : 0,
-        creditDebt: creditDebt !== undefined && creditDebt !== "" ? Number(creditDebt) : 0,
+        landAreaHa:
+          landAreaHa !== undefined && landAreaHa !== ""
+            ? Number(landAreaHa)
+            : null,
+        employeesCount:
+          employeesCount !== undefined && employeesCount !== ""
+            ? Number(employeesCount)
+            : null,
+        annualRevenue:
+          annualRevenue !== undefined && annualRevenue !== ""
+            ? Number(annualRevenue)
+            : null,
+        taxDebt:
+          taxDebt !== undefined && taxDebt !== ""
+            ? Number(taxDebt)
+            : 0,
+        creditDebt:
+          creditDebt !== undefined && creditDebt !== ""
+            ? Number(creditDebt)
+            : 0,
         priorViolationsCount3y:
           priorViolationsCount3y !== undefined && priorViolationsCount3y !== ""
             ? Number(priorViolationsCount3y)
@@ -298,12 +331,11 @@ app.post("/api/applications", authMiddleware, async (req, res) => {
       application,
     });
   } catch (error) {
-    console.error(error);
+    console.error("CREATE APPLICATION ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера при создании заявки" });
   }
 });
 
-// Мои заявки
 app.get("/api/applications/my", authMiddleware, async (req, res) => {
   try {
     const applications = await prisma.application.findMany({
@@ -313,12 +345,11 @@ app.get("/api/applications/my", authMiddleware, async (req, res) => {
 
     res.json(applications);
   } catch (error) {
-    console.error(error);
+    console.error("MY APPLICATIONS ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
 
-// Очередь эксперта
 app.get("/api/applications/queue", authMiddleware, requireExpert, async (req, res) => {
   try {
     const applications = await prisma.application.findMany({
@@ -329,12 +360,27 @@ app.get("/api/applications/queue", authMiddleware, requireExpert, async (req, re
             email: true,
             bin_iin: true,
             user_type: true,
+            region: true,
+            district: true,
+            phone: true,
+            postal_address: true,
           },
         },
       },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
-    applications.sort((a, b) => {
+    const mapped = applications.map((app) => ({
+      ...app,
+      organization_name: app.user?.organization_name || app.applicantName || "—",
+      email: app.user?.email || "—",
+      bin_iin: app.user?.bin_iin || "—",
+      region: app.region || app.user?.region || "—",
+    }));
+
+    mapped.sort((a, b) => {
       const byPriority = priorityRank(b.priority) - priorityRank(a.priority);
       if (byPriority !== 0) return byPriority;
 
@@ -344,14 +390,13 @@ app.get("/api/applications/queue", authMiddleware, requireExpert, async (req, re
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
-    res.json(applications);
+    res.json(mapped);
   } catch (error) {
-    console.error(error);
+    console.error("QUEUE ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
 
-// Статистика для дашборда
 app.get("/api/applications/stats", authMiddleware, requireExpert, async (req, res) => {
   try {
     const applications = await prisma.application.findMany();
@@ -377,24 +422,24 @@ app.get("/api/applications/stats", authMiddleware, requireExpert, async (req, re
 
     res.json(stats);
   } catch (error) {
-    console.error(error);
+    console.error("STATS ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
 
-// Обновить статус заявки экспертом
 app.patch("/api/applications/:id/status", authMiddleware, requireExpert, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = ["NEW", "REVIEW", "APPROVED", "REJECTED"];
+    const allowedStatuses = ["NEW", "REVIEW", "IN_REVIEW", "APPROVED", "REJECTED"];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: "Недопустимый статус" });
     }
 
     const applicationId = Number(id);
+
     if (Number.isNaN(applicationId)) {
       return res.status(400).json({ message: "Некорректный ID заявки" });
     }
@@ -417,12 +462,11 @@ app.patch("/api/applications/:id/status", authMiddleware, requireExpert, async (
       application: updated,
     });
   } catch (error) {
-    console.error(error);
+    console.error("UPDATE STATUS ERROR:", error);
     res.status(500).json({ message: "Ошибка сервера" });
   }
 });
 
-// Глобальный обработчик ошибок — после роутов
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(400).json({

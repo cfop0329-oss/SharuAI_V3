@@ -2,6 +2,8 @@ import { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function Register() {
   const navigate = useNavigate();
 
@@ -53,9 +55,10 @@ export default function Register() {
   ];
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
   };
 
@@ -64,21 +67,36 @@ export default function Register() {
     setCertificate(file);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage("");
-
-    if (!form.bin_iin || !form.user_type || !form.org_form || !form.organization_name || !form.director || !form.region || !form.email || !form.password) {
+  const validateForm = () => {
+    if (
+      !form.bin_iin ||
+      !form.user_type ||
+      !form.org_form ||
+      !form.organization_name ||
+      !form.director ||
+      !form.region ||
+      !form.email ||
+      !form.password
+    ) {
       setIsError(true);
       setMessage("Заполните все обязательные поля");
-      return;
+      return false;
     }
 
     if (form.password !== form.confirmPassword) {
       setIsError(true);
       setMessage("Пароли не совпадают");
-      return;
+      return false;
     }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
@@ -96,17 +114,19 @@ export default function Register() {
         data.append("certificate", certificate);
       }
 
-      await axios.post("http://localhost:5000/api/auth/register", data, {
+      await axios.post(`${API_URL}/api/auth/register`, data, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
       setMessage("Регистрация прошла успешно");
+
       setTimeout(() => {
         navigate("/");
       }, 1200);
     } catch (err) {
+      console.error("Register error:", err);
       setIsError(true);
       setMessage(err.response?.data?.message || "Ошибка регистрации");
     } finally {

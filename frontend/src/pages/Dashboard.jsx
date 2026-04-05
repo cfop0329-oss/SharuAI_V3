@@ -1,8 +1,25 @@
 import { Link, useNavigate } from "react-router-dom";
 
+function isExpertOrAdmin(user) {
+  const role = String(
+    user?.role || user?.user_role || user?.account_role || ""
+  ).toUpperCase();
+
+  const userType = String(user?.user_type || "").toLowerCase();
+
+  return (
+    role === "EXPERT" ||
+    role === "ADMIN" ||
+    userType.includes("эксперт") ||
+    userType.includes("админ") ||
+    userType.includes("admin")
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "null");
+  const canOpenExpertQueue = isExpertOrAdmin(user);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -30,9 +47,11 @@ export default function Dashboard() {
               Подать заявку
             </Link>
 
-            <Link to="/expert-queue" style={styles.queueButton}>
-              Очередь эксперта
-            </Link>
+            {canOpenExpertQueue ? (
+              <Link to="/expert-queue" style={styles.queueButton}>
+                Очередь эксперта
+              </Link>
+            ) : null}
 
             <button type="button" onClick={handleLogout} style={styles.secondaryButton}>
               Выйти
@@ -74,6 +93,16 @@ export default function Dashboard() {
                 <span style={styles.infoLabel}>Район</span>
                 <span style={styles.infoValue}>{user.district || "—"}</span>
               </div>
+
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>Телефон</span>
+                <span style={styles.infoValue}>{user.phone || "—"}</span>
+              </div>
+
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>Почтовый адрес</span>
+                <span style={styles.infoValue}>{user.postal_address || "—"}</span>
+              </div>
             </div>
 
             <div style={styles.card}>
@@ -88,9 +117,15 @@ export default function Dashboard() {
                   Перейти к форме субсидии
                 </Link>
 
-                <Link to="/expert-queue" style={styles.bigQueueButton}>
-                  Открыть очередь эксперта
-                </Link>
+                {canOpenExpertQueue ? (
+                  <Link to="/expert-queue" style={styles.bigQueueButton}>
+                    Открыть очередь эксперта
+                  </Link>
+                ) : (
+                  <div style={styles.infoNotice}>
+                    Очередь эксперта доступна только роли эксперт или администратор.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -259,6 +294,7 @@ const styles = {
     color: "#0f172a",
     fontSize: 15,
     fontWeight: 700,
+    wordBreak: "break-word",
   },
   quickActions: {
     display: "flex",
@@ -290,5 +326,13 @@ const styles = {
     color: "#0f766e",
     fontWeight: 700,
     textDecoration: "none",
+  },
+  infoNotice: {
+    borderRadius: 16,
+    padding: "14px 16px",
+    background: "#fff7ed",
+    border: "1px solid #fdba74",
+    color: "#9a3412",
+    fontWeight: 600,
   },
 };
